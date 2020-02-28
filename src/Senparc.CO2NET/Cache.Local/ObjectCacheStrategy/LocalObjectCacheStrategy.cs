@@ -1,7 +1,7 @@
 ﻿#region Apache License Version 2.0
 /*----------------------------------------------------------------
 
-Copyright 2018 Jeffrey Su & Suzhou Senparc Network Technology Co.,Ltd.
+Copyright 2019 Suzhou Senparc Network Technology Co.,Ltd.
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 except in compliance with the License. You may obtain a copy of the License at
@@ -19,7 +19,7 @@ Detail: https://github.com/Senparc/Senparc.CO2NET/blob/master/LICENSE
 #endregion Apache License Version 2.0
 
 /*----------------------------------------------------------------
-    Copyright (C) 2018 Senparc
+    Copyright (C) 2020 Senparc
 
     文件名：LocalContainerCacheStrategy.cs
     文件功能描述：本地容器缓存。
@@ -33,6 +33,9 @@ Detail: https://github.com/Senparc/Senparc.CO2NET/blob/master/LICENSE
     修改标识：Senparc - 20170205
     修改描述：v0.2.0 重构分布式锁
 
+    修改标识：Senparc - 20181226
+    修改描述：v0.4.3 修改 DateTime 为 DateTimeOffset
+
  ----------------------------------------------------------------*/
 
 
@@ -44,81 +47,17 @@ using System.Linq;
 using System.Text;
 using Senparc.CO2NET.Cache;
 using Senparc.CO2NET.Exceptions;
-#if NET35 || NET40 || NET45
+using System.Threading.Tasks;
+#if NET45
 using System.Web;
 #else
 using Microsoft.Extensions.Caching.Memory;
+
 #endif
 
 
 namespace Senparc.CO2NET.Cache
 {
-    /// <summary>
-    /// 全局静态数据源帮助类
-    /// </summary>
-    public static class LocalObjectCacheHelper
-    {
-#if NET35 || NET40 || NET45
-        /// <summary>
-        /// 所有数据集合的列表
-        /// </summary>
-        public static System.Web.Caching.Cache LocalObjectCache { get; set; }
-
-        static LocalObjectCacheHelper()
-        {
-            LocalObjectCache = System.Web.HttpRuntime.Cache;
-        }
-#else
-
-        private static IMemoryCache _localObjectCache;
-
-        /// <summary>
-        /// 所有数据集合的列表
-        /// </summary>
-        public static IMemoryCache LocalObjectCache
-        {
-            get
-            {
-                if (_localObjectCache == null)
-                {
-#if NETSTANDARD2_0
-                    _localObjectCache = new MemoryCache(new MemoryCacheOptions());
-#else
-                    _localObjectCache = SenparcDI.GetService<IMemoryCache>();
-
-                    if (_localObjectCache == null)
-                    {
-                        throw new CacheException("IMemoryCache 依赖注入未设置！请在 Startup.cs 中使用 serviceCollection.AddMemoryCache() 进行设置！");
-                    }
-#endif
-                }
-                return _localObjectCache;
-            }
-        }
-
-        /// <summary>
-        /// .NET Core 的 MemoryCache 不提供便利所有项目的方法，因此这里做一个储存Key的地方
-        /// </summary>
-        public static Dictionary<string, DateTime> Keys { get; set; } = new Dictionary<string, DateTime>();
-
-        static LocalObjectCacheHelper()
-        {
-
-        }
-
-        /// <summary>
-        /// 获取储存Keys信息的缓存键
-        /// </summary>
-        /// <param name="cacheStrategy"></param>
-        /// <returns></returns>
-        public static string GetKeyStoreKey(BaseCacheStrategy cacheStrategy)
-        {
-            var keyStoreFinalKey = cacheStrategy.GetFinalKey("CO2NET_KEY_STORE");
-            return keyStoreFinalKey;
-        }
-#endif
-    }
-
     /// <summary>
     /// 本地容器缓存策略
     /// </summary>
@@ -126,11 +65,10 @@ namespace Senparc.CO2NET.Cache
     {
         #region 数据源
 
-#if NET35 || NET40 || NET45
+#if NET45
         private System.Web.Caching.Cache _cache = LocalObjectCacheHelper.LocalObjectCache;
 #else
         private IMemoryCache _cache = LocalObjectCacheHelper.LocalObjectCache;
-
 #endif
 
         #endregion
@@ -173,11 +111,14 @@ namespace Senparc.CO2NET.Cache
         //    get { return LocalContainerCacheStrategy.Instance; }
         //}
 
+        #region 同步方法
+
         [Obsolete("此方法已过期，请使用 Set(TKey key, TValue value) 方法")]
         public void InsertToCache(string key, object value, TimeSpan? expiry = null)
         {
             Set(key, value, expiry, false);
         }
+
 
         public void Set(string key, object value, TimeSpan? expiry = null, bool isFullKey = false)
         {
@@ -188,7 +129,7 @@ namespace Senparc.CO2NET.Cache
 
             var finalKey = base.GetFinalKey(key, isFullKey);
 
-#if NET35 || NET40 || NET45
+#if NET45
             _cache[finalKey] = value;
 #else
             var newKey = !CheckExisted(finalKey, true);
@@ -255,7 +196,7 @@ namespace Senparc.CO2NET.Cache
 
             var cacheKey = GetFinalKey(key, isFullKey);
 
-#if NET35 || NET40 || NET45
+#if NET45
             return _cache[cacheKey];
 #else
             return _cache.Get(cacheKey);
@@ -283,7 +224,7 @@ namespace Senparc.CO2NET.Cache
 
             var cacheKey = GetFinalKey(key, isFullKey);
 
-#if NET35 || NET40 || NET45
+#if NET45
             return (T)_cache[cacheKey];
 #else
             return _cache.Get<T>(cacheKey);
@@ -293,7 +234,7 @@ namespace Senparc.CO2NET.Cache
         public IDictionary<string, object> GetAll()
         {
             IDictionary<string, object> data = new Dictionary<string, object>();
-#if NET35 || NET40 || NET45
+#if NET45
             IDictionaryEnumerator cacheEnum = System.Web.HttpRuntime.Cache.GetEnumerator();
 
             while (cacheEnum.MoveNext())
@@ -320,7 +261,7 @@ namespace Senparc.CO2NET.Cache
         {
             var cacheKey = GetFinalKey(key, isFullKey);
 
-#if NET35 || NET40 || NET45
+#if NET45
             return _cache.Get(cacheKey) != null;
 #else
             return _cache.Get(cacheKey) != null;
@@ -329,7 +270,7 @@ namespace Senparc.CO2NET.Cache
 
         public long GetCount()
         {
-#if NET35 || NET40 || NET45
+#if NET45
             return _cache.Count;
 #else
             var keyStoreFinalKey = LocalObjectCacheHelper.GetKeyStoreKey(this);
@@ -350,10 +291,61 @@ namespace Senparc.CO2NET.Cache
             Set(key, value, expiry, isFullKey);
         }
 
-        //public void UpdateContainerBag(string key, object bag, bool isFullKey = false)
-        //{
-        //    Update(key, bag, isFullKey);
-        //}
+        #endregion
+
+        #region 异步方法
+#if !NET35 && !NET40
+
+        public async Task SetAsync(string key, object value, TimeSpan? expiry = null, bool isFullKey = false)
+        {
+            await Task.Factory.StartNew(() => Set(key, value, expiry, isFullKey)).ConfigureAwait(false);
+        }
+
+        public async Task RemoveFromCacheAsync(string key, bool isFullKey = false)
+        {
+            await Task.Factory.StartNew(() => RemoveFromCache(key, isFullKey)).ConfigureAwait(false);
+        }
+
+        public async Task<object> GetAsync(string key, bool isFullKey = false)
+        {
+            return await Task.Factory.StartNew(() => Get(key, isFullKey)).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 返回指定缓存键的对象，并强制指定类型
+        /// </summary>
+        /// <param name="key">缓存键</param>
+        /// <param name="isFullKey">是否已经是完整的Key，如果不是，则会调用一次GetFinalKey()方法</param>
+        /// <returns></returns>
+        public async Task<T> GetAsync<T>(string key, bool isFullKey = false)
+        {
+            return await Task.Factory.StartNew(() => Get<T>(key, isFullKey)).ConfigureAwait(false);
+        }
+
+        public async Task<IDictionary<string, object>> GetAllAsync()
+        {
+            return await Task.Factory.StartNew(() => GetAll()).ConfigureAwait(false);
+        }
+
+
+        public async Task<bool> CheckExistedAsync(string key, bool isFullKey = false)
+        {
+            return await Task.Factory.StartNew(() => CheckExisted(key, isFullKey)).ConfigureAwait(false);
+
+        }
+
+        public async Task<long> GetCountAsync()
+        {
+            return await Task.Factory.StartNew(() => GetCount()).ConfigureAwait(false);
+        }
+
+
+        public async Task UpdateAsync(string key, object value, TimeSpan? expiry = null, bool isFullKey = false)
+        {
+            await Task.Factory.StartNew(() => Update(key, value, expiry, isFullKey)).ConfigureAwait(false);
+        }
+#endif
+        #endregion
 
         #endregion
 
@@ -361,9 +353,15 @@ namespace Senparc.CO2NET.Cache
 
         public override ICacheLock BeginCacheLock(string resourceName, string key, int retryCount = 0, TimeSpan retryDelay = new TimeSpan())
         {
-            return new LocalCacheLock(this, resourceName, key, retryCount, retryDelay);
+            return LocalCacheLock.CreateAndLock(this, resourceName, key, retryCount, retryDelay);
         }
 
+#if !NET35 && !NET40
+        public override async Task<ICacheLock> BeginCacheLockAsync(string resourceName, string key, int retryCount = 0, TimeSpan retryDelay = new TimeSpan())
+        {
+            return await LocalCacheLock.CreateAndLockAsync(this, resourceName, key, retryCount, retryDelay).ConfigureAwait(false);
+        }
+#endif
         #endregion
 
     }

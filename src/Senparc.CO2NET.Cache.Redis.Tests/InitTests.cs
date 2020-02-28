@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Senparc.CO2NET.RegisterServices;
+using Senparc.CO2NET.AspNet.RegisterServices;
 using Senparc.CO2NET.Tests;
 using System;
 using System.Collections.Generic;
@@ -27,12 +28,23 @@ namespace Senparc.CO2NET.Cache.Redis.Tests
             serviceCollection.AddSenparcGlobalServices(config);
             serviceCollection.AddMemoryCache();//使用内存缓存
 
-            var mockEnv = new Mock<IHostingEnvironment>();
+            var mockEnv = new Mock<Microsoft.Extensions.Hosting.IHostEnvironment/*IHostingEnvironment*/>();
             mockEnv.Setup(z => z.ContentRootPath).Returns(() => UnitTestHelper.RootPath);
-            var redisServer = "localhost:6379";
-           var registerService = RegisterService.Start(mockEnv.Object, new SenparcSetting() { IsDebug = true, Cache_Redis_Configuration= redisServer })
-                .UseSenparcGlobal();
 
+            RedisManager.ConfigurationOption = null;//测试前清除
+
+            var redisServer = "localhost:6379";
+
+            var senparcSetting = new SenparcSetting()
+            {
+                IsDebug = true,
+                Cache_Redis_Configuration = redisServer
+            };
+
+
+            var registerService = Senparc.CO2NET.AspNet.RegisterServices.
+                                    RegisterService.Start(mockEnv.Object, senparcSetting)
+                 .UseSenparcGlobal();
             Assert.AreEqual(null, RedisManager.ConfigurationOption);//当前还没有进行注册
 
             registerService.RegisterCacheRedis(

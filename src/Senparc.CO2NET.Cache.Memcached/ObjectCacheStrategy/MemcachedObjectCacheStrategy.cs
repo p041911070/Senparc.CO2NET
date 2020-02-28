@@ -1,5 +1,5 @@
 ﻿/*----------------------------------------------------------------
-    Copyright (C) 2018 Senparc
+    Copyright (C) 2020 Senparc
 
     文件名：MemcachedObjectCacheStrategy.cs
     文件功能描述：本地锁
@@ -22,12 +22,16 @@
     修改标识：Senparc - 20180802
     修改描述：v3.1.0 Memcached 缓存服务连接信息实现从 Config.SenparcSetting 自动获取信息并注册）
 
+    修改标识：Senparc - 20200220
+    修改描述：v1.1.100 重构 SenparcDI
+
 ----------------------------------------------------------------*/
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Threading.Tasks;
 using Enyim.Caching;
 using Enyim.Caching.Configuration;
 using Enyim.Caching.Memcached;
@@ -37,6 +41,8 @@ using Senparc.CO2NET.Exceptions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
+#else
+//using static System.Threading.Tasks.TasksExtension;
 #endif
 
 namespace Senparc.CO2NET.Cache.Memcached
@@ -90,7 +96,7 @@ namespace Senparc.CO2NET.Cache.Memcached
 #if !NET45
                 if (dic.Count() > 0)
                 {
-                    SenparcDI.GetServiceCollection().AddSenparcMemcached(options =>
+                    SenparcDI.GlobalServiceCollection.AddSenparcMemcached(options =>
                     {
                         foreach (var item in dic)
                         {
@@ -150,7 +156,7 @@ namespace Senparc.CO2NET.Cache.Memcached
             //                //config.Authentication.Parameters["userName"] = "username";
             //                //config.Authentication.Parameters["password"] = "password";
             //                //config.Authentication.Parameters["zone"] = "zone";//domain?   ——Jeffrey 2015.10.20
-            //                DateTime dt1 = DateTime.Now;
+            //                DateTime dt1 = SystemTime.Now;
             //                var config = GetMemcachedClientConfiguration();
             //                //var cache = new MemcachedClient(config);'
 
@@ -170,7 +176,7 @@ namespace Senparc.CO2NET.Cache.Memcached
             //                    throw new Exception("MemcachedStrategy失效，没有计入缓存！");
             //                }
             //                cache.Remove(testKey);
-            //                DateTime dt2 = DateTime.Now;
+            //                DateTime dt2 = SystemTime.Now;
 
             //                SenparcTrace.Log(string.Format("MemcachedStrategy正常启用，启动及测试耗时：{0}ms", (dt2 - dt1).TotalMilliseconds));
             //            }
@@ -193,12 +199,11 @@ namespace Senparc.CO2NET.Cache.Memcached
 #if NET45 //|| NET461
             Cache = new MemcachedClient(_config);
 #else
-            var provider = SenparcDI.GetIServiceProvider();
-            ILoggerFactory loggerFactory = provider.GetService<ILoggerFactory>();
+            var serviceProvider = SenparcDI.GlobalServiceCollection.BuildServiceProvider();
+            ILoggerFactory loggerFactory = serviceProvider.GetService<ILoggerFactory>();
             Cache = new MemcachedClient(loggerFactory, _config);
 #endif
         }
-
 
         //静态LocalCacheStrategy
         public static IBaseObjectCacheStrategy Instance
@@ -239,9 +244,9 @@ namespace Senparc.CO2NET.Cache.Memcached
             config.Protocol = MemcachedProtocol.Binary;
 
 #else
-            var provider = SenparcDI.GetIServiceProvider();
-            ILoggerFactory loggerFactory = provider.GetService<ILoggerFactory>();
-            IOptions<MemcachedClientOptions> optionsAccessor = provider.GetService<IOptions<MemcachedClientOptions>>();
+            var serviceProvider = SenparcDI.GlobalServiceCollection.BuildServiceProvider();
+            ILoggerFactory loggerFactory = serviceProvider.GetService<ILoggerFactory>();
+            IOptions<MemcachedClientOptions> optionsAccessor = serviceProvider.GetService<IOptions<MemcachedClientOptions>>();
 
             var config = new MemcachedClientConfiguration(loggerFactory, optionsAccessor);
 #endif
@@ -264,11 +269,7 @@ namespace Senparc.CO2NET.Cache.Memcached
 
         #region IContainerCacheStrategy 成员
 
-        //public IContainerCacheStrategy ContainerCacheStrategy
-        //{
-        //    get { return MemcachedContainerStrategy.Instance; }
-        //}
-
+        #region 同步方法
 
         [Obsolete("此方法已过期，请使用 Set(TKey key, TValue value) 方法")]
         public void InsertToCache(string key, object value, TimeSpan? expiry = null)
@@ -423,11 +424,213 @@ namespace Senparc.CO2NET.Cache.Memcached
 
         #endregion
 
+        #region 异步方法
+#if !NET35 && !NET40
+
+#if NET45
+
+        //当前使用的 Memcached 插件在 .NET 4.5 下未提供异步方法
+
+        public async Task SetAsync(string key, object value, TimeSpan? expiry = null, bool isFullKey = false)
+        {
+            await Task.Factory.StartNew(() => Set(key, value, expiry, isFullKey)).ConfigureAwait(false);
+
+        }
+
+        public virtual async Task RemoveFromCacheAsync(string key, bool isFullKey = false)
+        {
+            await Task.Factory.StartNew(() => RemoveFromCache(key, isFullKey)).ConfigureAwait(false);
+        }
+
+        public virtual async Task<object> GetAsync(string key, bool isFullKey = false)
+        {
+            return await Task.Factory.StartNew(() => Get(key, isFullKey)).ConfigureAwait(false);
+        }
+
+
+        public virtual async Task<T> GetAsync<T>(string key, bool isFullKey = false)
+        {
+            return await Task.Factory.StartNew(() => Get<T>(key, isFullKey)).ConfigureAwait(false);
+        }
+
+
+        public virtual async Task<IDictionary<string, object>> GetAllAsync()
+        {
+            return await Task.Factory.StartNew(() => GetAll()).ConfigureAwait(false);
+        }
+
+        public virtual async Task<bool> CheckExistedAsync(string key, bool isFullKey = false)
+        {
+            return await Task.Factory.StartNew(() => CheckExisted(key, isFullKey)).ConfigureAwait(false);
+        }
+
+        public virtual async Task<long> GetCountAsync()
+        {
+            return await Task.Factory.StartNew(() => GetCount()).ConfigureAwait(false);
+        }
+
+        public virtual async Task UpdateAsync(string key, object value, TimeSpan? expiry = null, bool isFullKey = false)
+        {
+            await SetAsync(key, value, expiry, isFullKey).ConfigureAwait(false);
+        }
+#else
+
+        public async Task SetAsync(string key, object value, TimeSpan? expiry = null, bool isFullKey = false)
+        {
+            if (string.IsNullOrEmpty(key) || value == null)
+            {
+                return;// TaskExtension.CompletedTask();
+            }
+
+            var cacheKey = GetFinalKey(key, isFullKey);
+
+            //TODO：加了绝对过期时间就会立即失效（再次获取后为null），memcache低版本的bug
+
+            var newKey = StoreKey ? await CheckExistedAsync(cacheKey, true).ConfigureAwait(false) == false : false;
+
+            var json = value.SerializeToCache();
+            if (expiry.HasValue)
+            {
+                await Cache.StoreAsync(StoreMode.Set, cacheKey, json, expiry.Value).ConfigureAwait(false);
+            }
+            else
+            {
+                await Cache.StoreAsync(StoreMode.Set, cacheKey, json, TimeSpan.FromDays(999999)/*不过期*/).ConfigureAwait(false);
+            }
+
+
+            //由于 Enyim.Caching 不支持遍历Keys，所以需要单独储存
+            if (newKey)
+            {
+                var keyStoreFinalKey = MemcachedObjectCacheStrategy.GetKeyStoreKey(this);
+                List<string> keys;
+                if (!await CheckExistedAsync(keyStoreFinalKey, true).ConfigureAwait(false))
+                {
+                    keys = new List<string>();
+                }
+                else
+                {
+                    keys = await GetAsync<List<string>>(keyStoreFinalKey, true).ConfigureAwait(false);
+                }
+                keys.Add(cacheKey);
+                await Cache.StoreAsync(StoreMode.Set, keyStoreFinalKey, keys.SerializeToCache(), TimeSpan.FromDays(999999)/*不过期*/).ConfigureAwait(false);
+            }
+
+        }
+
+        public virtual async Task RemoveFromCacheAsync(string key, bool isFullKey = false)
+        {
+            if (string.IsNullOrEmpty(key))
+            {
+                return;
+            }
+            var cacheKey = GetFinalKey(key, isFullKey);
+            await Cache.RemoveAsync(cacheKey).ConfigureAwait(false);
+
+            if (StoreKey)
+            {
+                //移除key
+                var keyStoreFinalKey = MemcachedObjectCacheStrategy.GetKeyStoreKey(this);
+                if (await CheckExistedAsync(keyStoreFinalKey, true).ConfigureAwait(false))
+                {
+                    var keys = await GetAsync<List<string>>(keyStoreFinalKey, true).ConfigureAwait(false);
+                    keys.Remove(cacheKey);
+                    await Cache.StoreAsync(StoreMode.Set, keyStoreFinalKey, keys.SerializeToCache(), TimeSpan.FromDays(999999)/*不过期*/).ConfigureAwait(false);
+                }
+            }
+        }
+
+        public virtual async Task<object> GetAsync(string key, bool isFullKey = false)
+        {
+            if (string.IsNullOrEmpty(key))
+            {
+                return null;
+            }
+
+            var cacheKey = GetFinalKey(key, isFullKey);
+            var json = await Cache.GetAsync<string>(cacheKey).ConfigureAwait(false);
+            var obj = json?.Value.DeserializeFromCache();
+            return obj;
+        }
+
+
+        public virtual async Task<T> GetAsync<T>(string key, bool isFullKey = false)
+        {
+            if (string.IsNullOrEmpty(key))
+            {
+                return default(T);
+            }
+
+            var cacheKey = GetFinalKey(key, isFullKey);
+            var json = await Cache.GetAsync<string>(cacheKey).ConfigureAwait(false);
+            var obj = json == null ? default(T) : json.Value.DeserializeFromCache<T>();
+            return obj;
+        }
+
+
+        public virtual async Task<IDictionary<string, object>> GetAllAsync()
+        {
+            IDictionary<string, object> data = new Dictionary<string, object>();
+
+            if (StoreKey)
+            {
+                //获取所有Key
+                var keyStoreFinalKey = MemcachedObjectCacheStrategy.GetKeyStoreKey(this);
+                if (await CheckExistedAsync(keyStoreFinalKey, true).ConfigureAwait(false))
+                {
+                    var keys = await GetAsync<List<string>>(keyStoreFinalKey, true).ConfigureAwait(false);
+                    foreach (var key in keys)
+                    {
+                        data[key] = Get(key, true);
+                    }
+                }
+            }
+
+            return data;
+        }
+
+        public virtual async Task<bool> CheckExistedAsync(string key, bool isFullKey = false)
+        {
+            return await Task.Factory.StartNew(() => CheckExisted(key, isFullKey)).ConfigureAwait(false);
+        }
+
+        public virtual async Task<long> GetCountAsync()
+        {
+            var keyStoreFinalKey = MemcachedObjectCacheStrategy.GetKeyStoreKey(this);
+            if (StoreKey && CheckExisted(keyStoreFinalKey, true))
+            {
+                var keys = await GetAsync<List<string>>(keyStoreFinalKey, true).ConfigureAwait(false);
+                return keys.Count;
+            }
+            else
+            {
+                return 0;
+            }
+        }
+
+        public virtual async Task UpdateAsync(string key, object value, TimeSpan? expiry = null, bool isFullKey = false)
+        {
+            await SetAsync(key, value, expiry, isFullKey).ConfigureAwait(false);
+        }
+
+#endif
+#endif
+        #endregion
+
+        #endregion
+
 
         public override ICacheLock BeginCacheLock(string resourceName, string key, int retryCount = 0, TimeSpan retryDelay = new TimeSpan())
         {
-            return new MemcachedCacheLock(this, resourceName, key, retryCount, retryDelay);
+            return MemcachedCacheLock.CreateAndLock(this, resourceName, key, retryCount, retryDelay);
         }
+
+
+        public override async Task<ICacheLock> BeginCacheLockAsync(string resourceName, string key, int retryCount = 0, TimeSpan retryDelay = new TimeSpan())
+        {
+            return await MemcachedCacheLock.CreateAndLockAsync(this, resourceName, key, retryCount, retryDelay).ConfigureAwait(false);
+        }
+
 
         /// <summary>
         /// Cache.TryGet(key, out value);

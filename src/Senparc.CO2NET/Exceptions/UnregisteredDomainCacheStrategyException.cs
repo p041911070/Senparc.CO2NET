@@ -1,5 +1,5 @@
 ﻿/*----------------------------------------------------------------
-    Copyright(C) 2018 Senparc
+    Copyright(C) 2019 Senparc
 
     文件名：UnregisteredDomainCacheStrategyException.cs
     文件功能描述：领域缓存未注册异常
@@ -25,8 +25,6 @@ namespace Senparc.CO2NET.Exceptions
     /// </summary>
     public class UnregisteredDomainCacheStrategyException : CacheException
     {
-
-
         /// <summary>
         /// UnregisteredDomainCacheStrategyException 构造函数
         /// </summary>

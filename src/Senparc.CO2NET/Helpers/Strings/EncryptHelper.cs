@@ -1,7 +1,7 @@
 ﻿#region Apache License Version 2.0
 /*----------------------------------------------------------------
 
-Copyright 2018 Jeffrey Su & Suzhou Senparc Network Technology Co.,Ltd.
+Copyright 2019 Suzhou Senparc Network Technology Co.,Ltd.
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 except in compliance with the License. You may obtain a copy of the License at
@@ -19,7 +19,7 @@ Detail: https://github.com/Senparc/Senparc.CO2NET/blob/master/LICENSE
 #endregion Apache License Version 2.0
 
 /*----------------------------------------------------------------
-    Copyright (C) 2018 Senparc
+    Copyright (C) 2020 Senparc
  
     创建标识：Senparc - 20160808
     创建描述：安全帮助类，提供SHA-1、AES算法等
@@ -158,7 +158,7 @@ namespace Senparc.CO2NET.Helpers
         {
             string retStr;
 
-#if NET35 || NET40 || NET45
+#if NET45
             MD5CryptoServiceProvider m5 = new MD5CryptoServiceProvider();
 #else
             MD5 m5 = MD5.Create();
@@ -204,12 +204,37 @@ namespace Senparc.CO2NET.Helpers
                 //使用UTF-8编码
                 return GetMD5("utf-8", Encoding.GetEncoding(charset));
 
-                //#if NET35 || NET40 || NET45
+                //#if NET45
                 //                inputBye = Encoding.GetEncoding("GB2312").GetBytes(encypStr);
                 //#else
                 //                inputBye = Encoding.GetEncoding(936).GetBytes(encypStr);
                 //#endif
             }
+        }
+
+        /// <summary>
+        /// 获取MD5签名结果
+        /// </summary>
+        /// <param name="stream">Stream</param>
+        /// <param name="encoding">默认为：utf8</param>
+        /// <param name="toUpper">是否返回大写结果，true：大写，false：小写</param>
+        /// <returns></returns>
+        public static string GetMD5(Stream stream, bool toUpper = true, Encoding encoding = null)
+        {
+            encoding = encoding ?? Encoding.UTF8;
+            stream.Position = 0;
+
+            System.Security.Cryptography.MD5 md5 = new System.Security.Cryptography.MD5CryptoServiceProvider();
+            byte[] ret = md5.ComputeHash(stream);
+
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < ret.Length; i++)
+            {
+                sb.Append(ret[i].ToString(toUpper ? "X2" : "x2"));
+            }
+
+            string md5str = sb.ToString();
+            return md5str;
         }
 
         /// <summary>
@@ -237,7 +262,7 @@ namespace Senparc.CO2NET.Helpers
         public static byte[] AESEncrypt(byte[] inputdata, byte[] iv, string strKey)
         {
             //分组加密算法   
-#if NET35 || NET40 || NET45
+#if NET45
             SymmetricAlgorithm des = Rijndael.Create();
 #else
             SymmetricAlgorithm des = Aes.Create();
@@ -274,7 +299,7 @@ namespace Senparc.CO2NET.Helpers
         /// <returns></returns>
         public static byte[] AESDecrypt(byte[] inputdata, byte[] iv, string strKey)
         {
-#if NET35 || NET40 || NET45
+#if NET45
             SymmetricAlgorithm des = Rijndael.Create();
 #else
             SymmetricAlgorithm des = Aes.Create();
@@ -339,7 +364,7 @@ namespace Senparc.CO2NET.Helpers
             return Convert.ToBase64String(resultArray, 0, resultArray.Length);
 
 
-            //#if NET35 || NET40 || NET45
+            //#if NET45
             //            SymmetricAlgorithm des = Rijndael.Create();
             //#else
             //            SymmetricAlgorithm des = Aes.Create();
@@ -384,7 +409,7 @@ namespace Senparc.CO2NET.Helpers
 
 
             //RijndaelManaged aes = new RijndaelManaged();
-#if NET35 || NET40 || NET45
+#if NET45
             SymmetricAlgorithm aes = Rijndael.Create();
 #else
             SymmetricAlgorithm aes = Aes.Create();
@@ -406,7 +431,7 @@ namespace Senparc.CO2NET.Helpers
             }
             finally
             {
-#if NET35 || NET40 || NET45
+#if NET45
                 cryptoStream.Close();
                 mStream.Close();
                 aes.Clear();

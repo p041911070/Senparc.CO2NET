@@ -1,7 +1,7 @@
 ﻿#region Apache License Version 2.0
 /*----------------------------------------------------------------
 
-Copyright 2018 Jeffrey Su & Suzhou Senparc Network Technology Co.,Ltd.
+Copyright 2019 Suzhou Senparc Network Technology Co.,Ltd.
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 except in compliance with the License. You may obtain a copy of the License at
@@ -19,7 +19,7 @@ Detail: https://github.com/Senparc/Senparc.CO2NET/blob/master/LICENSE
 #endregion Apache License Version 2.0
 
 /*----------------------------------------------------------------
-    Copyright (C) 2018 Senparc
+    Copyright (C) 2020 Senparc
   
     文件名：Config.cs
     文件功能描述：全局配置文件
@@ -39,11 +39,15 @@ Detail: https://github.com/Senparc/Senparc.CO2NET/blob/master/LICENSE
  
     修改标识：Senparc - 20180830
     修改描述：v0.2.9 优化 Config.RootDictionaryPath 方法，可自动获取默认值
+
+    修改标识：Senparc - 20180911
+    修改描述：v0.8.10 提供 Config.HostingEnvironment 属性 
    
 ----------------------------------------------------------------*/
 
 
 using System;
+using System.IO;
 using System.Text.RegularExpressions;
 
 namespace Senparc.CO2NET
@@ -120,14 +124,14 @@ namespace Senparc.CO2NET
         {
             get
             {
-                if (_rootDictionaryPath==null)
+                if (_rootDictionaryPath == null)
                 {
-#if NET35 || NET40 || NET45 || NETSTANDARD2_0
+#if NET45
                     var appPath = AppDomain.CurrentDomain.BaseDirectory;
 
-                    if (Regex.Match(appPath, @"\\$", RegexOptions.Compiled).Success)
+                    if (Regex.Match(appPath, $@"[\\/]$", RegexOptions.Compiled).Success)
                     {
-                        _rootDictionaryPath = appPath;//我们
+                        _rootDictionaryPath = appPath;//
                         //_rootDictionaryPath = appPath.Substring(0, appPath.Length - 1);
 
                     }

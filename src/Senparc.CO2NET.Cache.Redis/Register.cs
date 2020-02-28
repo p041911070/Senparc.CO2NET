@@ -1,5 +1,5 @@
 ﻿/*----------------------------------------------------------------
-    Copyright (C) 2018 Senparc
+    Copyright (C) 2020 Senparc
 
     文件名：Register.cs
     文件功能描述：Senparc.CO2NET.Cache.Redis 快捷注册流程
@@ -24,6 +24,9 @@ using System;
 
 namespace Senparc.CO2NET.Cache.Redis
 {
+    /// <summary>
+    /// Redis 注册
+    /// </summary>
     public static class Register
     {
         /// <summary>

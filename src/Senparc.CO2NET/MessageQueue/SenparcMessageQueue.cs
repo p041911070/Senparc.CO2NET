@@ -1,7 +1,7 @@
 ﻿#region Apache License Version 2.0
 /*----------------------------------------------------------------
 
-Copyright 2018 Jeffrey Su & Suzhou Senparc Network Technology Co.,Ltd.
+Copyright 2019 Suzhou Senparc Network Technology Co.,Ltd.
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 except in compliance with the License. You may obtain a copy of the License at
@@ -19,7 +19,7 @@ Detail: https://github.com/Senparc/Senparc.CO2NET/blob/master/LICENSE
 #endregion Apache License Version 2.0
 
 /*----------------------------------------------------------------
-    Copyright (C) 2018 Senparc
+    Copyright (C) 2020 Senparc
 
     文件名：SenparcMessageQueue.cs
     文件功能描述：SenparcMessageQueue消息队列
@@ -37,6 +37,12 @@ Detail: https://github.com/Senparc/Senparc.CO2NET/blob/master/LICENSE
 
     修改标识：Senparc - 20180601
     修改描述：v0.1.0 移植 SenparcMessageQueue
+
+    修改标识：Senparc - 20190812
+    修改描述：v0.8.8 改用继承 ConcurrentDictionary 后的 MessageQueueDictionary，对方法进行调整
+
+    修改标识：Senparc - 20191009
+    修改描述：v1.0.102 修改 SenparcMessageQueue.GetCurrentKey() 方法
 
 ----------------------------------------------------------------*/
 
@@ -56,10 +62,10 @@ namespace Senparc.CO2NET.MessageQueue
         /// <summary>
         /// 队列数据集合
         /// </summary>
-        public static Dictionary<string, SenparcMessageQueueItem> MessageQueueDictionary = new Dictionary<string, SenparcMessageQueueItem>(StringComparer.OrdinalIgnoreCase);
+        public static MessageQueueDictionary MessageQueueDictionary = new MessageQueueDictionary();
 
         /// <summary>
-        /// 同步执行锁
+        /// 同步执行锁（注意：此处不使用并发锁，也不实用缓存策略中的本地锁，否则如果在外部锁中记录日志可能会引发死循环）
         /// </summary>
         private static object MessageQueueSyncLock = new object();
         /// <summary>
@@ -95,7 +101,7 @@ namespace Senparc.CO2NET.MessageQueue
                 {
                     var mqItem = mq.GetItem(key); //获取任务项
                     mqItem.Action(); //执行
-                    mq.Remove(key); //清除
+                    mq.Remove(key, out SenparcMessageQueueItem value); //清除
                     key = mq.GetCurrentKey(); //获取最新的Key
                 }
             }
@@ -109,7 +115,13 @@ namespace Senparc.CO2NET.MessageQueue
         {
             lock (MessageQueueSyncLock)
             {
-                return MessageQueueDictionary.Keys.FirstOrDefault();
+                //不直接使用 Key 是因为 Key 的顺序是不确定的
+                var value = MessageQueueDictionary.Values.OrderBy(z=>z.AddTime).FirstOrDefault();
+                if (value==null)
+                {
+                    return null;
+                }
+                return value.Key;
             }
         }
 
@@ -150,7 +162,7 @@ namespace Senparc.CO2NET.MessageQueue
                 //}
 
                 var mqItem = new SenparcMessageQueueItem(key, action);
-                MessageQueueDictionary[key] = mqItem;
+                MessageQueueDictionary.TryAdd(key, mqItem);
                 return mqItem;
             }
         }
@@ -158,15 +170,22 @@ namespace Senparc.CO2NET.MessageQueue
         /// <summary>
         /// 移除队列成员
         /// </summary>
-        /// <param name="key"></param>
-        public void Remove(string key)
+        /// <param name="key">缓存键</param>
+        /// <param name="value">移除信息的 value 对象</param>
+        /// <returns>如果移除成功或key不存在则返回 true,否则返回 false</returns>
+        public bool Remove(string key, out SenparcMessageQueueItem value)
         {
             lock (MessageQueueSyncLock)
             {
                 if (MessageQueueDictionary.ContainsKey(key))
                 {
-                    MessageQueueDictionary.Remove(key);
+                    return MessageQueueDictionary.TryRemove(key, out value);
                     //MessageQueueList.Remove(key);
+                }
+                else
+                {
+                    value = null;
+                    return true;
                 }
             }
         }

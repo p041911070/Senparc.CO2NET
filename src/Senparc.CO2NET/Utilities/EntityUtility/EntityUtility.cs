@@ -1,7 +1,7 @@
 ﻿#region Apache License Version 2.0
 /*----------------------------------------------------------------
 
-Copyright 2018 Jeffrey Su & Suzhou Senparc Network Technology Co.,Ltd.
+Copyright 2019 Suzhou Senparc Network Technology Co.,Ltd.
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 except in compliance with the License. You may obtain a copy of the License at
@@ -19,7 +19,7 @@ Detail: https://github.com/Senparc/Senparc.CO2NET/blob/master/LICENSE
 #endregion Apache License Version 2.0
 
 /*----------------------------------------------------------------
-    Copyright (C) 2018 Senparc
+    Copyright (C) 2020 Senparc
 
     文件名：EntityUtility.cs
     文件功能描述：实体工具类
@@ -62,7 +62,7 @@ namespace Senparc.CO2NET.Utilities
             }
             
             var t = typeof(T);
-#if NET35 || NET40 || NET45
+#if NET45
             if (t.IsGenericType)
 #else
             if (t.GetTypeInfo().IsGenericType)
@@ -112,6 +112,9 @@ namespace Senparc.CO2NET.Utilities
                         break;
                     case "DateTime":
                         setValue = DateTimeHelper.GetDateTimeFromXml(value.ToString());
+                        break;
+                    case "DateTimeOffset":
+                        setValue = DateTimeHelper.GetDateTimeOffsetFromXml(value.ToString());
                         break;
                     case "Int32":
                         setValue = value.ConvertTo<int>();

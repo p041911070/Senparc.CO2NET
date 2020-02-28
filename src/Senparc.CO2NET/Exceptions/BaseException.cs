@@ -1,5 +1,5 @@
 ﻿/*----------------------------------------------------------------
-    Copyright(C) 2018 Senparc
+    Copyright(C) 2019 Senparc
 
     文件名：BaseException.cs
     文件功能描述：异常基类
@@ -18,7 +18,7 @@ namespace Senparc.CO2NET.Exceptions
     /// <summary>
     /// 异常基类
     /// </summary>
-#if NET35 || NET40 || NET45
+#if NET45
     public class BaseException : ApplicationException
 #else
     public class BaseException : Exception

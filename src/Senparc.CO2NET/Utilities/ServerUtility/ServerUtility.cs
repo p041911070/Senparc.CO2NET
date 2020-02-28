@@ -1,7 +1,7 @@
 ﻿#region Apache License Version 2.0
 /*----------------------------------------------------------------
 
-Copyright 2018 Jeffrey Su & Suzhou Senparc Network Technology Co.,Ltd.
+Copyright 2019 Suzhou Senparc Network Technology Co.,Ltd.
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 except in compliance with the License. You may obtain a copy of the License at
@@ -19,13 +19,17 @@ Detail: https://github.com/Senparc/Senparc.CO2NET/blob/master/LICENSE
 #endregion Apache License Version 2.0
 
 /*----------------------------------------------------------------
-    Copyright (C) 2018 Senparc
+    Copyright (C) 2020 Senparc
     
     文件名：ServerUtility.cs
     文件功能描述：服务器工具类
     
     
     创建标识：Senparc - 20180819
+
+    修改标识：Senparc - 20181225
+    修改描述：v0.4.2 优化 ServerUtility 类中方法在 docker 或 linux 环境下的路径识别
+
 
 ----------------------------------------------------------------*/
 
@@ -55,7 +59,7 @@ namespace Senparc.CO2NET.Utilities
             {
                 if (_appDomainAppPath == null)
                 {
-#if NET35 || NET40 || NET45
+#if NET45
                     _appDomainAppPath = HttpRuntime.AppDomainAppPath;
 #else
                     _appDomainAppPath = AppContext.BaseDirectory; //dll所在目录：;
@@ -66,10 +70,12 @@ namespace Senparc.CO2NET.Utilities
             set
             {
                 _appDomainAppPath = value;
-#if NETSTANDARD1_6 || NETSTANDARD2_0 || NETCOREAPP2_0 || NETCOREAPP2_1
-                if (!_appDomainAppPath.EndsWith("/"))
+#if !NET45
+                var pathSeparator = Path.DirectorySeparatorChar.ToString();
+                var altPathSeparator = Path.AltDirectorySeparatorChar.ToString();
+                if (!_appDomainAppPath.EndsWith(pathSeparator) && !_appDomainAppPath.EndsWith(altPathSeparator))
                 {
-                    _appDomainAppPath += "/";
+                    _appDomainAppPath += pathSeparator;
                 }
 #endif
             }
@@ -86,13 +92,24 @@ namespace Senparc.CO2NET.Utilities
             {
                 return "";
             }
-            else if (virtualPath.StartsWith("~/"))
-            {
-                return virtualPath.Replace("~/", Config.RootDictionaryPath).Replace("/", "\\");
-            }
             else
             {
-                return Path.Combine(Config.RootDictionaryPath, virtualPath);
+                //if (!Config.RootDictionaryPath.EndsWith("/") || Config.RootDictionaryPath.EndsWith("\\"))
+                var pathSeparator = Path.DirectorySeparatorChar.ToString();
+                var altPathSeparator = Path.AltDirectorySeparatorChar.ToString();
+                if (!Config.RootDictionaryPath.EndsWith(pathSeparator) && !Config.RootDictionaryPath.EndsWith(altPathSeparator))
+                {
+                    Config.RootDictionaryPath += pathSeparator;
+                }
+
+                if (virtualPath.StartsWith("~/"))
+                {
+                    return virtualPath.Replace("~/", Config.RootDictionaryPath).Replace("/", pathSeparator);
+                }
+                else
+                {
+                    return Path.Combine(Config.RootDictionaryPath, virtualPath);
+                }
             }
         }
 
@@ -109,7 +126,8 @@ namespace Senparc.CO2NET.Utilities
             }
             else if (virtualPath.StartsWith("~/"))
             {
-                return virtualPath.Replace("~/", AppDomainAppPath).Replace("/", "\\");
+                var pathSeparator = Path.DirectorySeparatorChar.ToString();
+                return virtualPath.Replace("~/", AppDomainAppPath).Replace("/", pathSeparator);
             }
             else
             {
